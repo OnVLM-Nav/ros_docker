@@ -1,0 +1,40 @@
+services:
+  ros:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # $GID 는 bash 내장이 아니므로 run.sh 에서 export 한다
+        USER_UID: ${UID:-1000}
+        USER_GID: ${GID:-1000}
+        INPUT_GID: ${INPUT_GID:-995}
+    network_mode: "host"    # ROS 2 DDS 통신
+    ipc: "host"             # 공유 메모리 전송
+    privileged: true        # 조이스틱 등 /dev 접근
+    user: ros
+    working_dir: /home/ros/ws
+    environment:
+      RMW_IMPLEMENTATION: rmw_fastrtps_cpp
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-1}
+      DISPLAY: $DISPLAY
+      NVIDIA_DRIVER_CAPABILITIES: all   # rviz2 GPU 렌더링
+    volumes:
+      - ./workspace:/home/ros/ws
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - /etc/localtime:/etc/localtime:ro
+      - /dev/dri:/dev/dri
+      # 조이스틱: 디렉토리 전체를 넘겨 hot-plug 도 그대로 보이게 한다
+      - /dev/input:/dev/input
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu, graphics, display, compute, utility]
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    entrypoint: ["/bin/bash", "-lc"]
+    command: ["tail -f /dev/null"]
